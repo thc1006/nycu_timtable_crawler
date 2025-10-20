@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """
-NYCU Course Crawler - 改進版（單線程）
-國立陽明交通大學課程爬蟲（改進版）
+NYCU Course Crawler - 4線程版本
+國立陽明交通大學課程爬蟲（4線程改進版）
 
 功能：
 1. 爬取課程基本資訊
-2. 爬取詳細課程綱要（可選）
+2. 爬取詳細課程綱要（可選）- 使用4線程並行
 3. 支援斷點續爬
 4. 自動重試與錯誤處理
 5. 進度顯示與時間預估
 6. 輸出標準化陣列格式 JSON
+7. 4線程並行處理以提升性能
 
-作者：Droid (Factory AI)
-版本：4.0（單線程版）
+作者：Droid (Factory AI) + AI Enhancements
+版本：4.1（4線程版）
 最後更新：2025-01-20
 生產環境等級：✓ (Production Grade)
 """
@@ -24,9 +25,12 @@ import time
 import os
 import sys
 import warnings
+import threading
 import argparse
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
 
 # 忽略 SSL 警告
 warnings.filterwarnings('ignore', message='Unverified HTTPS request')
@@ -35,10 +39,12 @@ warnings.filterwarnings('ignore', message='Unverified HTTPS request')
 DEFAULT_YEAR = 114          # 學年度
 DEFAULT_SEMESTER = 1        # 學期 (1=上學期, 2=下學期, X=暑期)
 DEFAULT_FETCH_OUTLINE = False  # 是否抓取課程綱要
+DEFAULT_NUM_THREADS = 4     # 線程數量
+DEFAULT_TIMEOUT_SECONDS = 600  # 10 分鐘 timeout
 # ======================================
 
 class NYCUCrawler:
-    """陽明交大課程爬蟲類別"""
+    """陽明交大課程爬蟲類別（4線程版本）"""
 
     # 時段對應表
     PERIOD_TIME_MAP = {
@@ -60,11 +66,12 @@ class NYCUCrawler:
         'U': (7, 'Sunday')
     }
 
-    def __init__(self, year, semester, fetch_outline=False):
+    def __init__(self, year, semester, fetch_outline=False, num_threads=4):
         """初始化爬蟲"""
         self.year = year
         self.semester = semester
         self.fetch_outline = fetch_outline
+        self.num_threads = num_threads
         self.acysem = str(year) + str(semester)
         self.flang = "zh-tw"
         self.headers = {
@@ -84,6 +91,11 @@ class NYCUCrawler:
             'outline_fail': 0,
             'start_time': None
         }
+
+        # Thread-safe 鎖
+        self.stats_lock = Lock()
+        self.courses_lock = Lock()
+        self.print_lock = Lock()
 
     def parse_schedule_structured(self, time_classroom_str):
         """
@@ -399,7 +411,8 @@ class NYCUCrawler:
 
                 # 適應性成功判斷：只要有任何一個 API 成功就算成功
                 if success_count > 0:
-                    self.stats['outline_success'] += 1
+                    with self.stats_lock:
+                        self.stats['outline_success'] += 1
                     return outline_data
                 else:
                     raise Exception("所有 API 都沒有返回有效資料")
@@ -410,7 +423,8 @@ class NYCUCrawler:
                     try:
                         html_result = self.extract_outline_from_html(cos_id, timeout=4)
                         if html_result:
-                            self.stats['outline_success'] += 1
+                            with self.stats_lock:
+                                self.stats['outline_success'] += 1
                             return html_result
                     except:
                         pass
@@ -425,15 +439,24 @@ class NYCUCrawler:
                     try:
                         html_result = self.extract_outline_from_html(cos_id, timeout=3)
                         if html_result:
-                            self.stats['outline_success'] += 1
+                            with self.stats_lock:
+                                self.stats['outline_success'] += 1
                             return html_result
                     except:
                         pass
 
-                    self.stats['outline_fail'] += 1
+                    with self.stats_lock:
+                        self.stats['outline_fail'] += 1
                     return None
 
         return None
+
+    def _fetch_outline_worker(self, course):
+        """單個課程綱要爬取的 worker 函數（供線程使用）"""
+        if 'outline' not in course:
+            outline = self.get_course_outline(course['id'])
+            if outline:
+                course['outline'] = outline
 
     def get_type(self):
         """取得課程類型列表"""
@@ -487,7 +510,8 @@ class NYCUCrawler:
         raw_data = json.loads(r.text)
 
         # 使用 set 來追蹤已處理的課程 ID
-        existing_ids = {course['id'] for course in self.courses_list}
+        with self.courses_lock:
+            existing_ids = {course['id'] for course in self.courses_list}
 
         for dep_value in raw_data:
             language = raw_data[dep_value]["language"]
@@ -544,29 +568,33 @@ class NYCUCrawler:
                         "raw_time_classroom": raw_cos_data["cos_time"]  # 保留原始格式以供參考
                     }
 
-                    self.courses_list.append(course)
-                    existing_ids.add(cos_id)
-                    self.stats['total_courses'] += 1
+                    with self.courses_lock:
+                        self.courses_list.append(course)
+                        existing_ids.add(cos_id)
+                        with self.stats_lock:
+                            self.stats['total_courses'] += 1
 
     def print_progress(self):
         """顯示進度"""
-        total = self.stats['total_courses']
-        success = self.stats['outline_success']
-        fail = self.stats['outline_fail']
-        processed = success + fail
+        with self.stats_lock:
+            total = self.stats['total_courses']
+            success = self.stats['outline_success']
+            fail = self.stats['outline_fail']
+            processed = success + fail
 
-        if total > 0:
-            progress_pct = (processed / total) * 100
+            if total > 0:
+                progress_pct = (processed / total) * 100
 
-            if self.stats['start_time'] and processed > 0:
-                elapsed = (datetime.now() - self.stats['start_time']).total_seconds()
-                avg_time = elapsed / processed
-                remaining = (total - processed) * avg_time
-                eta = timedelta(seconds=int(remaining))
+                if self.stats['start_time'] and processed > 0:
+                    elapsed = (datetime.now() - self.stats['start_time']).total_seconds()
+                    avg_time = elapsed / processed
+                    remaining = (total - processed) * avg_time
+                    eta = timedelta(seconds=int(remaining))
 
-                print(f"\r進度: {processed}/{total} ({progress_pct:.1f}%) | "
-                      f"成功: {success} | 失敗: {fail} | "
-                      f"預估剩餘: {eta}", end='', flush=True)
+                    with self.print_lock:
+                        print(f"\r進度: {processed}/{total} ({progress_pct:.1f}%) | "
+                              f"成功: {success} | 失敗: {fail} | "
+                              f"預估剩餘: {eta}", end='', flush=True)
 
     def save_checkpoint(self, filename, metadata):
         """保存檢查點"""
@@ -577,29 +605,46 @@ class NYCUCrawler:
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(checkpoint_data, f, ensure_ascii=False, indent=2)
 
-    def fetch_all_outlines(self, checkpoint_file, metadata):
-        """批次取得所有課程綱要"""
-        print("\n開始取得課程綱要...")
+    def fetch_all_outlines_multithreaded(self, checkpoint_file, metadata):
+        """批次取得所有課程綱要（4線程版本）"""
+        with self.print_lock:
+            print(f"\n開始取得課程綱要（{self.num_threads}線程）...")
+
         self.stats['start_time'] = datetime.now()
         count = 0
 
-        for course in self.courses_list:
-            if 'outline' not in course:
-                outline = self.get_course_outline(course['id'])
-                if outline:
-                    course['outline'] = outline
+        # 取得需要爬取綱要的課程
+        courses_to_fetch = [c for c in self.courses_list if 'outline' not in c]
+        total_to_fetch = len(courses_to_fetch)
+
+        if total_to_fetch == 0:
+            with self.print_lock:
+                print("所有課程綱要已獲取")
+            return
+
+        # 使用 ThreadPoolExecutor 進行並行爬取
+        with ThreadPoolExecutor(max_workers=self.num_threads) as executor:
+            futures = {executor.submit(self._fetch_outline_worker, course): course
+                      for course in courses_to_fetch}
+
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    with self.print_lock:
+                        print(f"\n線程錯誤: {e}")
 
                 count += 1
                 self.print_progress()
 
                 # 每 50 門課程保存一次
                 if count % 50 == 0:
-                    # 更新 metadata
                     metadata['last_updated'] = datetime.now().isoformat() + 'Z'
                     metadata['total_courses'] = len(self.courses_list)
                     self.save_checkpoint(checkpoint_file, metadata)
 
-        print()  # 換行
+        with self.print_lock:
+            print()  # 換行
 
     def create_metadata(self):
         """建立 metadata"""
@@ -614,8 +659,9 @@ class NYCUCrawler:
             "total_courses": len(self.courses_list),
             "last_updated": datetime.now().isoformat() + 'Z',
             "source_url": "https://timetable.nycu.edu.tw",
-            "crawler_version": "4.0",
+            "crawler_version": "4.1-multithreaded",
             "data_format_version": "2.0",
+            "num_threads": self.num_threads,
             "with_outline": self.fetch_outline
         }
 
@@ -624,40 +670,45 @@ class NYCUCrawler:
         # 決定輸出路徑
         if self.fetch_outline:
             output_dir = "course_data/with_outline"
-            output_file = f"{output_dir}/{self.year}-{self.semester}_data_with_outline.json"
-            checkpoint_file = f"{output_dir}/{self.year}-{self.semester}_checkpoint.json"
+            output_file = f"{output_dir}/{self.year}-{self.semester}_data_with_outline_4thread.json"
+            checkpoint_file = f"{output_dir}/{self.year}-{self.semester}_checkpoint_4thread.json"
         else:
             output_dir = "course_data/basic"
-            output_file = f"{output_dir}/{self.year}-{self.semester}_data.json"
+            output_file = f"{output_dir}/{self.year}-{self.semester}_data_4thread.json"
             checkpoint_file = None
 
         # 確保目錄存在
         os.makedirs(output_dir, exist_ok=True)
 
-        print("=" * 70)
-        print(f"NYCU 課程爬蟲 v4.0 - {self.year} 學年度第 {self.semester} 學期")
-        if self.fetch_outline:
-            print("模式：完整綱要（新格式）")
-        else:
-            print("模式：基本資訊（新格式）")
-        print("=" * 70)
+        with self.print_lock:
+            print("=" * 70)
+            print(f"NYCU 課程爬蟲 v4.1（4線程） - {self.year} 學年度第 {self.semester} 學期")
+            if self.fetch_outline:
+                print("模式：完整綱要（新格式）")
+            else:
+                print("模式：基本資訊（新格式）")
+            print(f"線程數：{self.num_threads}")
+            print("=" * 70)
 
         # 檢查是否有檢查點
         if self.fetch_outline and checkpoint_file and os.path.exists(checkpoint_file):
-            print(f"\n發現檢查點檔案: {checkpoint_file}")
+            with self.print_lock:
+                print(f"\n發現檢查點檔案: {checkpoint_file}")
             with open(checkpoint_file, 'r', encoding='utf-8') as f:
                 checkpoint_data = json.load(f)
                 self.courses_list = checkpoint_data.get('courses', [])
 
-            print(f"已載入 {len(self.courses_list)} 門課程")
+            with self.print_lock:
+                print(f"已載入 {len(self.courses_list)} 門課程")
             completed = sum(1 for c in self.courses_list if 'outline' in c)
-            print(f"其中 {completed} 門已有綱要")
+            with self.print_lock:
+                print(f"其中 {completed} 門已有綱要")
 
             self.stats['total_courses'] = len(self.courses_list)
             self.stats['outline_success'] = completed
 
             metadata = self.create_metadata()
-            self.fetch_all_outlines(checkpoint_file, metadata)
+            self.fetch_all_outlines_multithreaded(checkpoint_file, metadata)
 
             # 保存最終結果
             final_data = {
@@ -670,18 +721,21 @@ class NYCUCrawler:
             if os.path.exists(checkpoint_file):
                 os.remove(checkpoint_file)
 
-            print(f"\n完成！資料已儲存至: {output_file}")
+            with self.print_lock:
+                print(f"\n完成！資料已儲存至: {output_file}")
             return
 
         start_time = datetime.now()
 
         # 階段 1: 取得課程基本資料
-        print("\n階段 1: 取得課程基本資料...")
+        with self.print_lock:
+            print("\n階段 1: 取得課程基本資料...")
         types = self.get_type()
 
         for i in range(len(types)):
             ftype = types[i]["uid"]
-            print(f"  處理: {types[i]['cname']}")
+            with self.print_lock:
+                print(f"  處理: {types[i]['cname']}")
             categories = self.get_category(ftype)
 
             if types[i]["cname"] == "其他課程":
@@ -708,15 +762,17 @@ class NYCUCrawler:
                                     self.dep_list.append(fdep)
                                     self.get_cos(fdep)
 
-        print(f"\n已取得 {len(self.courses_list)} 門課程的基本資料")
+        with self.print_lock:
+            print(f"\n已取得 {len(self.courses_list)} 門課程的基本資料")
 
         # 建立 metadata
         metadata = self.create_metadata()
 
         # 階段 2: 取得課程綱要（如果需要）
         if self.fetch_outline:
-            print("\n階段 2: 取得課程綱要...")
-            self.fetch_all_outlines(checkpoint_file, metadata)
+            with self.print_lock:
+                print("\n階段 2: 取得課程綱要...")
+            self.fetch_all_outlines_multithreaded(checkpoint_file, metadata)
 
             if checkpoint_file and os.path.exists(checkpoint_file):
                 os.remove(checkpoint_file)
@@ -738,38 +794,40 @@ class NYCUCrawler:
         elapsed = end_time - start_time
 
         # 顯示統計
-        print("\n" + "=" * 70)
-        print("爬取完成！")
-        print(f"總課程數: {self.stats['total_courses']}")
-        if self.fetch_outline:
-            print(f"綱要成功: {self.stats['outline_success']}")
-            print(f"綱要失敗: {self.stats['outline_fail']}")
+        with self.print_lock:
+            print("\n" + "=" * 70)
+            print("爬取完成！")
+            print(f"總課程數: {self.stats['total_courses']}")
+            if self.fetch_outline:
+                print(f"綱要成功: {self.stats['outline_success']}")
+                print(f"綱要失敗: {self.stats['outline_fail']}")
+                if self.stats['total_courses'] > 0:
+                    success_rate = (self.stats['outline_success'] / self.stats['total_courses']) * 100
+                    print(f"成功率: {success_rate:.1f}%")
+            print(f"總花費時間: {elapsed}")
             if self.stats['total_courses'] > 0:
-                success_rate = (self.stats['outline_success'] / self.stats['total_courses']) * 100
-                print(f"成功率: {success_rate:.1f}%")
-        print(f"總花費時間: {elapsed}")
-        if self.stats['total_courses'] > 0:
-            print(f"平均每門課: {elapsed.total_seconds()/self.stats['total_courses']:.2f} 秒")
-        print(f"資料已儲存至: {output_file}")
-        print(f"資料格式版本: 2.0 (陣列格式)")
-        print("=" * 70)
+                print(f"平均每門課: {elapsed.total_seconds()/self.stats['total_courses']:.2f} 秒")
+            print(f"資料已儲存至: {output_file}")
+            print(f"資料格式版本: 2.0 (陣列格式)")
+            print(f"線程配置: {self.num_threads}線程")
+            print("=" * 70)
 
 
 def main():
     """主函數 - 支援命令行參數"""
     parser = argparse.ArgumentParser(
-        description='NYCU Course Crawler - 國立陽明交通大學課程爬蟲 (Single-threaded)',
+        description='NYCU Course Crawler - 國立陽明交通大學課程爬蟲 (4-threaded)',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 範例用法：
-  # 爬取 114 年第 1 學期的基本課程資訊
-  python nycu_crawler.py --year 114 --semester 1
+  # 爬取 114 年第 1 學期的基本課程資訊（4線程）
+  python nycu_crawler_multithreaded.py --year 114 --semester 1
 
-  # 爬取 113 年第 2 學期並包含課程綱要
-  python nycu_crawler.py --year 113 --semester 2 --outline
+  # 爬取 113 年第 2 學期並包含課程綱要（8線程）
+  python nycu_crawler_multithreaded.py --year 113 --semester 2 --outline --threads 8
 
-  # 使用預設值 (114 年第 1 學期，不包含綱要)
-  python nycu_crawler.py
+  # 使用預設值 (114 年第 1 學期，不包含綱要，4線程，10分鐘timeout)
+  python nycu_crawler_multithreaded.py
         """)
 
     parser.add_argument(
@@ -790,9 +848,21 @@ def main():
         help='是否爬取課程綱要 (預設: 不爬取)'
     )
     parser.add_argument(
+        '--threads',
+        type=int,
+        default=DEFAULT_NUM_THREADS,
+        help=f'並行線程數量 (預設: {DEFAULT_NUM_THREADS}，建議 2-8)'
+    )
+    parser.add_argument(
+        '--timeout',
+        type=int,
+        default=DEFAULT_TIMEOUT_SECONDS,
+        help=f'執行超時時間（秒） (預設: {DEFAULT_TIMEOUT_SECONDS})'
+    )
+    parser.add_argument(
         '--version',
         action='version',
-        version='NYCU Crawler v4.0 (Single-threaded, Production Grade)'
+        version='NYCU Crawler v4.1 (4-threaded, Production Grade)'
     )
 
     args = parser.parse_args()
@@ -806,8 +876,29 @@ def main():
         print("錯誤: 學期必須為 1 或 2")
         sys.exit(1)
 
+    if args.threads < 1 or args.threads > 16:
+        print("錯誤: 線程數必須介於 1 到 16 之間")
+        sys.exit(1)
+
+    if args.timeout < 60:
+        print("錯誤: Timeout 必須至少 60 秒")
+        sys.exit(1)
+
     # 建立爬蟲實例並執行
-    crawler = NYCUCrawler(args.year, args.semester, args.outline)
+    crawler = NYCUCrawler(args.year, args.semester, args.outline, args.threads)
+
+    # 設定總 timeout
+    import signal
+
+    def timeout_handler(signum, frame):
+        print(f"\n\n超時：達到 {args.timeout} 秒的執行時間限制")
+        sys.exit(1)
+
+    # 僅在 Unix 系統上設定 signal timeout
+    if hasattr(signal, 'SIGALRM'):
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(args.timeout)
+
     try:
         crawler.crawl()
     except KeyboardInterrupt:
