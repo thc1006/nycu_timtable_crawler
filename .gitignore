@@ -35,6 +35,29 @@ Thumbs.db
 # Checkpoint files (from crawler)
 *_checkpoint.json
 
+# Crawled data files (too large for git)
+course_data/basic/*.json
+course_data/with_outline/*.json
+!course_data/basic/.gitkeep
+!course_data/with_outline/.gitkeep
+
+# Logs directory
+logs/
+!logs/.gitkeep
+
+# Documentation (auto-generated)
+docs/*.log
+docs/*.tmp
+
+# Legacy/backup data
+legacy_data/
+backup/
+old/
+
+# Crawler logs
+outline_*.log
+crawl_*.log
+
 # Prerequisites
 *.d
 

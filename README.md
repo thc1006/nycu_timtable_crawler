@@ -1,355 +1,337 @@
-# NYCU 課程爬蟲
+# NYCU 課程爬蟲 v4.0
 
-國立陽明交通大學課程資料爬蟲工具，支援爬取課程基本資訊與完整課程綱要。
+[![Python](https://img.shields.io/badge/Python-3.7+-blue.svg)](https://www.python.org)
+[![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
+[![NYCU](https://img.shields.io/badge/NYCU-陽明交大-orange.svg)](https://www.nycu.edu.tw)
+[![GitHub stars](https://img.shields.io/github/stars/thc1006/nycu_timtable_crawler)](https://github.com/thc1006/nycu_timtable_crawler/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/thc1006/nycu_timtable_crawler)](https://github.com/thc1006/nycu_timtable_crawler/network)
+[![GitHub issues](https://img.shields.io/github/issues/thc1006/nycu_timtable_crawler)](https://github.com/thc1006/nycu_timtable_crawler/issues)
+[![GitHub last commit](https://img.shields.io/github/last-commit/thc1006/nycu_timtable_crawler)](https://github.com/thc1006/nycu_timtable_crawler/commits)
 
-[![Python](https://img.shields.io/badge/Python-3.7+-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+國立陽明交通大學課程資訊爬蟲系統
 
-## ✨ 功能特色
+## 🎯 功能特色
 
-### 基本功能
-- ✅ 爬取課程基本資訊（課號、課名、教師、學分、時間、教室等）
-- ✅ 爬取完整課程綱要（先修科目、課程概述、教科書、評分方式、每週進度、單元時數）
-- ✅ 支援任意學期（修改參數即可）
-- ✅ 批次爬取多學期資料
+- ✅ **雙模式爬取**：基本資訊 / 完整課程綱要
+- ✅ **新資料格式**：陣列格式 v2.0（易於資料分析與使用）
+- ✅ **多執行緒支援**：4 執行緒並行，速度提升 3-4 倍
+- ✅ **結構化資料**：時間、教室、學分等自動解析
+- ✅ **斷點續爬**：支援中斷後繼續爬取
+- ✅ **錯誤重試**：自動重試機制，提高成功率
 
-### 進階功能
-- ✅ 進度顯示與剩餘時間預估
-- ✅ 斷點續爬（中斷後可繼續）
-- ✅ 錯誤自動重試（最多3次）
-- ✅ 批次保存防止資料丟失
-- ✅ Google Colab 支援
+## 📦 快速開始
 
-## 📊 爬取結果
-
-### 114-1 學期完整爬取
-- **總課程數**：3,619 門
-- **綱要成功率**：98.1% (3,550/3,619)
-- **總耗時**：59 分 35 秒
-- **平均速度**：0.99 秒/門課
-- **檔案大小**：26.93 MB
-- **資料完整性**：所有綱要欄位 100% 完整
-
-### 已收錄學期（基本資訊）
-- 112-1：3,584 門課程
-- 112-2：3,623 門課程
-- 113-1：3,642 門課程
-- 113-2：3,562 門課程
-- 114-1：3,619 門課程
-
-## 📁 專案結構
-
-```
-nycu_timtable_crawler/
-├── nycu_crawler.py              # 主要爬蟲程式 (Production)
-├── crawl_basic_batch.py         # 批次爬取基本資訊工具
-├── NYCU_Crawler_Basic.ipynb    # Google Colab 版本 (基本資訊)
-├── NYCU_Crawler_WithOutline.ipynb  # Google Colab 版本 (含綱要)
-├── README.md                    # 專案說明文件
-├── app.js                       # 前端應用程式
-├── index.html                   # 網頁介面
-├── style.css                    # 樣式表
-└── course_data/                 # 課程資料目錄
-    ├── basic/                   # 基本資訊 (112-1 ~ 114-1)
-    │   ├── 112-1_data.json
-    │   ├── 112-2_data.json
-    │   ├── 113-1_data.json
-    │   ├── 113-2_data.json
-    │   └── 114-1_data.json
-    └── with_outline/            # 完整綱要
-        └── 114-1_data_with_outline.json
-```
-
-### 主要檔案說明
-
-| 檔案 | 說明 | 速度 | 資料完整性 |
-|------|------|------|-----------|
-| `nycu_crawler.py` | 統一爬蟲程式，可選基本/完整模式 | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| `NYCU_Crawler_Basic.ipynb` | Colab版 - 基本資訊 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
-| `NYCU_Crawler_WithOutline.ipynb` | Colab版 - 完整綱要 | ⭐⭐ | ⭐⭐⭐⭐⭐ |
-
-## 🚀 快速開始
-
-### 方法 1: 本地執行（推薦）
-
-#### 1. 安裝依賴
+### 1. 安裝相依套件
 
 ```bash
 pip install requests
 ```
 
-#### 2. 選擇爬取模式
-
-**基本資訊模式（快速）：**
-```python
-# 修改 nycu_crawler.py 的參數
-YEAR = 114
-SEMESTER = 1
-FETCH_OUTLINE = False  # 只爬基本資訊
-```
+### 2. 爬取單一學期（基本資訊）
 
 ```bash
 python nycu_crawler.py
 ```
-- 輸出：`course_data/basic/114-1_data.json`
-- 耗時：約 2-3 分鐘
 
-**完整綱要模式（詳細）：**
+修改 `nycu_crawler.py` 的參數：
 ```python
-# 修改 nycu_crawler.py 的參數
+YEAR = 114          # 學年度
+SEMESTER = 1        # 學期 (1=上學期, 2=下學期)
+FETCH_OUTLINE = False  # False=基本資訊, True=完整綱要
+```
+
+### 3. 批次爬取多個學期（推薦，使用多執行緒）
+
+```bash
+python scripts/crawl_basic_batch_multithreaded.py
+```
+
+### 4. 使用 Google Colab (免安裝環境)
+
+**基本資訊版（已更新至 v4.0）**：
+1. 開啟 `notebooks/NYCU_Crawler_Basic.ipynb`
+2. 上傳到 [Google Colab](https://colab.research.google.com/)
+3. 依序執行所有 cells
+4. 下載生成的 JSON 檔案
+
+**優點**：
+- 無需安裝 Python 環境
+- 雲端執行，不佔用本機資源
+- 已包含 v4.0 所有新功能
+
+**完整綱要版**：
+- 參考 `notebooks/README_NOTEBOOK_UPDATE.md`
+
+## 📊 資料格式說明
+
+### 新格式 v2.0（陣列格式）
+
+輸出檔案包含 `metadata` 和 `courses` 兩部分：
+
+```json
+{
+  "metadata": {
+    "semester": "114-1",
+    "semester_name": "113學年度上學期",
+    "total_courses": 8028,
+    "last_updated": "2025-10-20T10:30:00Z",
+    "data_format_version": "2.0"
+  },
+  "courses": [
+    {
+      "id": "515002",
+      "semester_code": "1141",
+      "name": "微分方程",
+      "teacher": "楊春美",
+      "credit": 3.0,
+      "hours": 3.0,
+      "type": "必修",
+      "enrollment": {
+        "limit": 55,
+        "current": 66
+      },
+      "schedule": [
+        {
+          "day": 1,
+          "day_name": "Monday",
+          "periods": [3, 4],
+          "time_start": "10:10",
+          "time_end": "12:00",
+          "classroom": "EE102",
+          "floor": "GF"
+        }
+      ],
+      "english_taught": false,
+      "tags": ["工程數學"]
+    }
+  ]
+}
+```
+
+### 主要改進
+
+| 項目 | 舊格式 | 新格式 v2.0 |
+|------|--------|-------------|
+| **資料結構** | 物件（Object） | 陣列（Array） |
+| **學分/時數** | 字串 `"3.00"` | 數字 `3.0` |
+| **時間表** | 字串 `["M3", "M4"]` | 結構化物件（含星期、節次、時間、教室） |
+| **人數資訊** | 兩個欄位 | 巢狀物件 `enrollment` |
+| **Metadata** | 無 | 完整學期資訊 |
+
+## 📁 專案結構
+
+```
+nycu_timtable_crawler/
+├── nycu_crawler.py                    # 主要爬蟲程式 (v4.0)
+├── check_progress.py                  # 進度監控工具
+├── scripts/
+│   ├── crawl_basic_batch_multithreaded.py      # 基本資訊（多執行緒，推薦）
+│   ├── crawl_outline_batch_multithreaded.py    # 完整綱要（多執行緒）
+│   └── single_thread/
+│       ├── crawl_basic_batch.py                # 批次爬取（單執行緒）
+│       └── crawl_with_outline.py               # 完整綱要（單執行緒）
+├── course_data/
+│   ├── basic/                         # 基本課程資訊（已完成）
+│   │   ├── 110-1_data.json           # 7,055 門課程
+│   │   ├── 110-2_data.json           # 7,298 門課程
+│   │   ├── 111-1_data.json           # 7,197 門課程
+│   │   ├── 111-2_data.json           # 7,075 門課程
+│   │   ├── 112-1_data.json           # 7,853 門課程
+│   │   ├── 112-2_data.json           # 7,261 門課程
+│   │   ├── 113-1_data.json           # 7,997 門課程
+│   │   ├── 113-2_data.json           # 7,385 門課程
+│   │   └── 114-1_data.json           # 8,028 門課程
+│   └── with_outline/                  # 完整課程綱要（爬取中）
+├── notebooks/                         # Jupyter Notebook 版本
+│   ├── NYCU_Crawler_Basic.ipynb      # 基本資訊版（已更新至 v4.0）
+│   ├── NYCU_Crawler_WithOutline.ipynb  # 完整綱要版
+│   └── README_NOTEBOOK_UPDATE.md     # Notebook 說明文件
+└── README.md
+```
+
+## 🚀 使用案例
+
+### 基本資訊模式
+
+**適用於**：
+- 課表排課工具
+- 課程搜尋系統
+- 選課助手
+- 時間衝堂檢查
+
+**爬取速度**：每學期約 2-3 分鐘（約 7,000-8,000 門課程）
+
+### 完整綱要模式
+
+**適用於**：
+- 課程內容研究
+- 教學大綱資料庫
+- 課程推薦系統
+- 先修課程分析
+
+**爬取速度**：每學期約 50-60 分鐘（需呼叫 4 個額外 API）
+
+**額外包含**：
+- 課程描述、先修科目
+- 評分方式、教科書
+- 每週授課進度（16-18 週）
+- 單元時數分配
+
+## 💡 常見問題
+
+### Q: 如何只爬取最新學期？
+
+修改 `nycu_crawler.py` 並直接執行：
+```python
 YEAR = 114
 SEMESTER = 1
-FETCH_OUTLINE = True  # 爬取完整綱要
 ```
 
+### Q: 如何爬取完整綱要？
+
+方法一：修改主程式
+```python
+FETCH_OUTLINE = True  # 改為 True
+```
+
+方法二：使用專用腳本
 ```bash
-python nycu_crawler.py
-```
-- 輸出：`course_data/with_outline/114-1_data_with_outline.json`
-- 耗時：約 40-60 分鐘
-
-#### 3. 批次爬取多學期
-
-使用批次工具一次爬取多學期基本資訊：
-
-```bash
-python crawl_basic_batch.py
+python scripts/single_thread/crawl_with_outline.py
 ```
 
-### 方法 2: Google Colab（免安裝）
+### Q: 資料更新頻率？
 
-#### 基本資訊版
-1. 開啟 `NYCU_Crawler_Basic.ipynb`
-2. 上傳到 Google Colab
-3. 依序執行所有儲存格
-4. 下載生成的 JSON 檔案
+建議每學期開學前 1-2 週爬取一次，課程資訊較穩定。
 
-#### 完整綱要版
-1. 開啟 `NYCU_Crawler_WithOutline.ipynb`
-2. 上傳到 Google Colab
-3. 依序執行所有儲存格（需時約 40-60 分鐘）
-4. 下載生成的 JSON 檔案
+### Q: 為什麼使用陣列格式？
 
-### 斷點續爬
+陣列格式符合業界標準（RESTful API），易於：
+- 分頁、排序、篩選
+- 匯入資料庫（PostgreSQL/MongoDB）
+- 前端框架使用（React/Vue）
+- 資料分析（Pandas）
 
-如果爬取過程中斷（僅限完整綱要模式）：
+## 📈 效能數據
 
-1. 重新執行爬蟲程式
-2. 系統會自動偵測檢查點檔案
-3. 選擇 `y` 即可從中斷處繼續
+| 學期 | 課程數 | 檔案大小 | 爬取時間 |
+|------|--------|----------|----------|
+| 110-1 | 7,055 | 5.3 MB | 2分36秒 |
+| 110-2 | 7,298 | 5.0 MB | 3分03秒 |
+| 111-1 | 7,197 | 5.2 MB | 2分57秒 |
+| 111-2 | 7,075 | 5.1 MB | 3分10秒 |
+| 112-1 | 7,853 | 5.7 MB | 3分09秒 |
+| 112-2 | 7,261 | 5.2 MB | 2分51秒 |
+| 113-1 | 7,997 | 5.8 MB | 3分03秒 |
+| 113-2 | 7,385 | 5.3 MB | 3分07秒 |
+| 114-1 | 8,028 | 5.8 MB | 2分34秒 |
 
-## 📄 資料結構
+**總計**：66,149 門課程，47.4 MB，使用多執行緒約 3 分鐘完成全部
 
-### 基本資訊
+## 🔧 技術細節
 
+### 結構化時間解析
+
+原始格式：`"M34W2-EE102[GF]"`
+
+解析為：
 ```json
 {
-  "1141_515100": {
-    "id": "515100",
-    "name": "機率",
-    "teacher": "陳志鴻",
-    "credit": "3.00",
-    "hours": "3.00",
-    "time": ["T5", "T6", "F2"],
-    "classroom": ["ED103[GF]"],
-    "time-classroom": "T56F2-ED103[GF]",
-    "num_limit": "55",
-    "reg_num": "50",
-    "english": true,
-    "type": "選修",
-    "brief": ["核心通識"]
-  }
+  "day": 1,
+  "day_name": "Monday",
+  "periods": [3, 4],
+  "time_start": "10:10",
+  "time_end": "12:00",
+  "classroom": "EE102",
+  "floor": "GF"
 }
 ```
 
-### 課程綱要（outline）
+### 時段對照表
 
-```json
-{
-  "outline": {
-    "base": {
-      "cos_name": "機率",
-      "cos_eng_name": "Probability",
-      "dep_name": "資訊工程學系",
-      "cos_code": "EEEC10002"
-    },
-    "description": {
-      "prerequisite": "微積分、線性代數、程式設計",
-      "outline": "教授以微積分為基礎的機率論理論與應用...",
-      "textbook": "Introduction to Probability, 2nd Edition",
-      "exam_score": "作業: 30%, 期中考: 30%, 期末考: 40%",
-      "teach_method": "講授與習作"
-    },
-    "weekly_schedule": [
-      {
-        "week_id": "1",
-        "class_date": "2025-09-01(一),2025-09-03(三)",
-        "class_data": "課程介紹、組合數學"
-      }
-    ],
-    "unit_hours": [
-      {
-        "title": "機率基本概念",
-        "content": "樣本空間、事件、機率公理",
-        "hour_teaching": "3"
-      }
-    ]
-  }
-}
+- **星期代碼**：M=一, T=二, W=三, R=四, F=五, S=六, U=日
+- **節次代碼**：
+  - y = 06:00-06:50
+  - z = 07:00-07:50
+  - 1-9 = 08:00-18:20
+  - n = 12:10-13:00
+  - a-d = 18:25-22:00
+
+## 📝 版本歷史
+
+### v4.0 (2025-10-20)
+- ✨ 全新陣列格式 v2.0
+- ✨ 結構化時間/教室解析
+- ✨ 多執行緒批次爬取
+- ✨ 型別標準化（數字改用 number）
+- ✨ 加入 metadata 資訊
+- ✨ 範例腳本（課程搜尋、統計分析、衝堂檢測）
+
+### v3.0
+- 支援斷點續爬
+- 錯誤重試機制
+- 進度顯示與 ETA
+
+### v2.0
+- 加入完整課程綱要支援
+- 批次爬取功能
+
+### v1.0
+- 基本課程資訊爬取
+
+## 📚 使用範例
+
+我們提供了實用的範例腳本，位於 `examples/` 目錄：
+
+### 1. 課程搜尋 (`search_courses.py`)
+```bash
+python examples/search_courses.py
 ```
+示範如何：
+- 依課程名稱搜尋（如「微積分」）
+- 依教師姓名搜尋
+- 依學分數搜尋
+- 依上課時間搜尋（如星期一的課）
 
-## 📈 效能分析
-
-### 速度對比
-
-| 模式 | 延遲/API | 單門課程 | 3000門課程預估 |
-|------|---------|---------|---------------|
-| 基本資訊 | N/A | 0.04秒 | 2-3 分鐘 |
-| 完整綱要 | 0.2秒 | 1.0秒 | 50分鐘 |
-
-### 網路負載說明
-
-每門課程需要發送：
-- 基本資訊：1 個 API 請求
-- 課程綱要：4 個 API 請求（base, description, syllabuses, optional）
-
-## ⚠️ 注意事項
-
-### 1. 網路穩定性
-- 建議在穩定的網路環境下執行
-- 如遇中斷，可使用斷點續爬功能
-
-### 2. 執行時間
-- 基本資訊：約 2-3 分鐘
-- 完整綱要：約 40-60 分鐘
-- 建議在非高峰時段執行
-
-### 3. 資料完整性
-- 部分課程可能未填寫完整綱要資訊
-- 系統會自動重試失敗的課程（最多3次）
-- 最終成功率通常 > 98%
-
-### 4. 伺服器友善
-- 已加入適當延遲，避免對學校伺服器造成負擔
-- 請勿修改延遲時間過短
-- 請勿同時執行多個爬蟲程式
-
-## 🛠️ 進階使用
-
-### 只爬取特定系所
-
-修改 `nycu_crawler.py` 中的 `get_cos()` 函數：
-
-```python
-target_deps = ["資訊工程學系", "電機工程學系"]
-
-# 在系所迴圈中加入過濾
-if deps[fdep] in target_deps:
-    self.get_cos(fdep)
+### 2. 統計分析 (`analyze_statistics.py`)
+```bash
+python examples/analyze_statistics.py
 ```
+提供：
+- 學分分布圖表
+- 課程類型統計
+- 授課語言比例
+- 熱門上課時段
+- 選課熱門度分析
 
-### 調整重試次數
-
-在 `get_course_outline()` 函數中修改：
-
-```python
-def get_course_outline(self, cos_id, max_retries=5):  # 改為5次
+### 3. 衝堂檢測 (`check_conflicts.py`)
+```bash
+python examples/check_conflicts.py
 ```
+功能：
+- 檢查兩門課程是否衝突
+- 找出選課清單中的所有衝突
+- 尋找不衝突的課程組合
 
-### 修改檢查點保存頻率
+詳細說明請參閱各腳本內的註解。
 
-在 `fetch_all_outlines()` 函數中修改：
+## 📜 授權
 
-```python
-if count % 100 == 0:  # 改為每100門課保存
-    self.save_checkpoint(checkpoint_file)
-```
+Apache License 2.0
 
-## 📊 資料用途
+詳見 [LICENSE](LICENSE) 檔案。
 
-爬取的資料可用於：
+## 🙋 問題回報與貢獻
 
-- 📅 課程時間表視覺化
-- 🔍 課程搜尋系統
-- 📈 課程統計分析
-- 🤖 課程推薦系統
-- 📚 選課輔助工具
-- 🎓 課程內容研究
+- 問題回報：請開 [Issue](https://github.com/thc1006/nycu_timtable_crawler/issues)
+- 貢獻指南：參閱 [CONTRIBUTING.md](CONTRIBUTING.md)
+- 版本歷史：參閱 [CHANGELOG.md](CHANGELOG.md)
+- 聯絡信箱：hctsai@linux.com
 
-## 🐛 問題排查
-
-### 問題 1：爬取失敗率過高
-
-**可能原因：**
-- 網路不穩定
-- 學校伺服器繁忙
-
-**解決方法：**
-1. 檢查網路連線
-2. 增加延遲時間（修改 `time.sleep` 參數）
-3. 使用斷點續爬功能重試失敗的課程
-
-### 問題 2：執行速度太慢
-
-**可能原因：**
-- 網路速度慢
-- 延遲設定過長
-
-**解決方法：**
-1. 確認網路速度
-2. 適當減少延遲（但不建議低於 0.2 秒）
-
-### 問題 3：中斷後無法續爬
-
-**可能原因：**
-- 檢查點檔案損壞
-
-**解決方法：**
-1. 刪除 `course_data/with_outline/*_checkpoint.json`
-2. 重新執行爬蟲
-
-## 📈 使用統計
-
-### 資料覆蓋範圍
-- **學期數**：5 個學期（112-1 ~ 114-1）
-- **課程總數**：18,030 門（基本資訊）
-- **完整綱要**：3,550 門（114-1）
-
-### 效能指標
-- **基本資訊爬取**：0.04 秒/門課
-- **完整綱要爬取**：0.99 秒/門課
-- **綱要成功率**：98.1%
-
-## 🤝 貢獻指南
-
-歡迎提交 Issue 和 Pull Request！
-
-### 如何貢獻
-1. Fork 本專案
-2. 建立新分支 (`git checkout -b feature/amazing-feature`)
-3. 提交變更 (`git commit -m 'Add amazing feature'`)
-4. 推送到分支 (`git push origin feature/amazing-feature`)
-5. 開啟 Pull Request
-
-## ⚖️ 免責聲明
-
-1. 本工具僅供**學習研究使用**
-2. 請遵守學校相關規定，**合理使用學校資源**
-3. 使用者需自行承擔使用本工具的一切責任
-4. 請勿將爬取資料用於商業用途
-
-## 📄 授權
-
-本專案採用 MIT 授權條款，詳見 [LICENSE](LICENSE) 檔案。
-
-## 📮 聯絡方式
-
-如有問題或建議，歡迎：
-- 提交 [Issue](../../issues)
-- 發起 [Discussion](../../discussions)
+歡迎陽明交大的同學們一起參與貢獻！
 
 ---
 
-**測試環境**：Python 3.7+  
-**相容系統**：Windows / macOS / Linux / Google Colab  
-**最後更新**：2025-01-19
+**更新日期**: 2025-10-20
+**爬蟲版本**: v4.0
+**資料格式**: v2.0 (陣列格式)
+**資料集**: 110-1 至 114-1 學期（66,149 門課程）

@@ -1,0 +1,139 @@
+{
+  "metadata": {
+    "semester": "114-1",
+    "semester_name": "113學年度上學期",
+    "academic_year": 114,
+    "term": 1,
+    "total_courses": 8028,
+    "last_updated": "2025-10-20T10:56:02.339526Z",
+    "source_url": "https://timetable.nycu.edu.tw",
+    "crawler_version": "4.0",
+    "data_format_version": "2.0",
+    "with_outline": false
+  },
+  "courses": [
+    {
+      "id": "515002",
+      "semester_code": "1141",
+      "name": "微分方程",
+      "teacher": "楊春美",
+      "credit": 3.0,
+      "hours": 3.0,
+      "type": "必修",
+      "enrollment": {
+        "limit": 55,
+        "current": 66
+      },
+      "schedule": [
+        {
+          "day": 1,
+          "day_name": "Monday",
+          "periods": [
+            3,
+            4
+          ],
+          "time_start": "10:10",
+          "time_end": "12:00",
+          "classroom": "EE102",
+          "floor": "GF"
+        },
+        {
+          "day": 3,
+          "day_name": "Wednesday",
+          "periods": [
+            2
+          ],
+          "time_start": "09:00",
+          "time_end": "09:50",
+          "classroom": "EE102",
+          "floor": "GF"
+        }
+      ],
+      "english_taught": false,
+      "tags": [],
+      "raw_time_classroom": "M34W2-EE102[GF]"
+    },
+    {
+      "id": "515003",
+      "semester_code": "1141",
+      "name": "微分方程",
+      "teacher": "鄭裕庭",
+      "credit": 3.0,
+      "hours": 3.0,
+      "type": "必修",
+      "enrollment": {
+        "limit": 55,
+        "current": 60
+      },
+      "schedule": [
+        {
+          "day": 1,
+          "day_name": "Monday",
+          "periods": [
+            3,
+            4
+          ],
+          "time_start": "10:10",
+          "time_end": "12:00",
+          "classroom": "ED203",
+          "floor": "GF"
+        },
+        {
+          "day": 3,
+          "day_name": "Wednesday",
+          "periods": [
+            2
+          ],
+          "time_start": "09:00",
+          "time_end": "09:50",
+          "classroom": "ED203",
+          "floor": "GF"
+        }
+      ],
+      "english_taught": false,
+      "tags": [],
+      "raw_time_classroom": "M34W2-ED203[GF]"
+    },
+    {
+      "id": "515004",
+      "semester_code": "1141",
+      "name": "微分方程",
+      "teacher": "陳稷康",
+      "credit": 3.0,
+      "hours": 3.0,
+      "type": "必修",
+      "enrollment": {
+        "limit": 55,
+        "current": 66
+      },
+      "schedule": [
+        {
+          "day": 1,
+          "day_name": "Monday",
+          "periods": [
+            3,
+            4
+          ],
+          "time_start": "10:10",
+          "time_end": "12:00",
+          "classroom": "EE209",
+          "floor": "GF"
+        },
+        {
+          "day": 3,
+          "day_name": "Wednesday",
+          "periods": [
+            2
+          ],
+          "time_start": "09:00",
+          "time_end": "09:50",
+          "classroom": "EE209",
+          "floor": "GF"
+        }
+      ],
+      "english_taught": false,
+      "tags": [],
+      "raw_time_classroom": "M34W2-EE209[GF]"
+    }
+  ]
+}
